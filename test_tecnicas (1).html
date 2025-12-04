@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Técnico: Explicaciones Basadas en Temario, Filtro y Guardado</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 800px; margin: auto; background-color: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        h1 { color: #007bff; text-align: center; margin-bottom: 20px; }
+        .controls { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
+        .filter-controls { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 5px; width: 100%; }
+        .filter-controls button { flex-grow: 1; padding: 10px 5px; background-color: #6c757d; font-size: 0.9em; }
+        .filter-controls button.active { background-color: #007bff; }
+
+        .question-block { margin-bottom: 25px; padding: 15px; border: 1px solid #dee2e6; border-radius: 8px; background-color: #e9ecef40; }
+        .question-block strong { display: block; margin-bottom: 10px; font-size: 1.1em; color: #495057; }
+        .option label { display: block; margin-bottom: 8px; cursor: pointer; padding: 5px; border-radius: 4px; transition: background-color 0.2s; }
+        .feedback { margin-top: 5px; font-weight: bold; padding: 5px 0; min-height: 20px; }
+        .correct { color: #28a745; }
+        .incorrect { color: #dc3545; }
+        .explanation { font-weight: normal; margin-top: 10px; padding: 8px; border-left: 3px solid; background-color: #f8f9fa; }
+        .correct .explanation { border-color: #28a745; }
+        .incorrect .explanation { border-color: #dc3545; }
+        
+        button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 1em; flex-grow: 1; transition: background-color 0.3s; color: white; }
+        #show-score { background-color: #007bff; }
+        #reset-button { background-color: #dc3545; }
+        #random-button { background-color: #ffc107; color: #333; }
+        
+        #show-score:hover { background-color: #0056b3; }
+        #reset-button:hover { background-color: #c82333; }
+        #random-button:hover { background-color: #e0a800; }
+        
+        #score-summary { text-align: center; margin-top: 40px; padding: 20px; border: 2px dashed #007bff; border-radius: 8px; font-size: 1.2em; font-weight: bold; display: none; background-color: #e6f2ff; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🔬 Test Técnico: Explicaciones Basadas en Temario</h1>
+    <p>Retroalimentación inmediata con justificaciones conceptuales detalladas de tu material de estudio.</p>
+    
+    <div class="controls">
+        <div class="filter-controls">
+            <button onclick="applyFilter('all')" id="filter-all" class="active">Ver Todas</button>
+            <button onclick="applyFilter('pending')" id="filter-pending">Pendientes</button>
+            <button onclick="applyFilter('incorrect')" id="filter-incorrect">Falladas</button>
+            <button onclick="applyFilter('correct')" id="filter-correct">Acertadas</button>
+        </div>
+        
+        <button id="show-score" onclick="showFinalScore()">Mostrar Puntuación Total</button>
+        <button id="random-button" onclick="shuffleQuestions()">🎲 Orden Aleatorio</button>
+        <button id="reset-button" onclick="resetAnswers()">🧹 Reiniciar Respuestas</button>
+    </div>
+    <hr>
+
+    <div id="quiz-container">
+        </div>
+    
+    <div id="score-summary"></div>
+
+</div>
+
+<script>
+    // --- 1. Definiciones de Respuestas Correctas y Preguntas con Explicación PROFUNDA (Basada en RESUMEN TÉCNICAS.pdf) ---
+    const correctAnswers = {
+        'q1': 'b', 'q2': 'b', 'q3': 'd', 'q4': 'b', 'q5': 'b', 'q6': 'c', 'q7': 'b', 'q8': 'b', 'q9': 'c', 'q10': 'c',
+        'q11': 'c', 'q12': 'c', 'q13': 'a', 'q14': 'c', 'q15': 'b', 'q16': 'b', 'q17': 'b', 'q18': 'c', 'q19': 'a', 'q20': 'b',
+        'q21': 'b', 'q22': 'b', 'q23': 'b', 'q24': 'c', 'q25': 'b', 'q26': 'a', 'q27': 'c', 'q28': 'a', 'q29': 'b', 'q30': 'a',
+        'q31': 'a', 'q32': 'b', 'q33': 'b', 'q34': 'c', 'q35': 'b', 'q36': 'c', 'q37': 'b', 'q38': 'a', 'q39': 'b', 'q40': 'b',
+        'q41': 'a', 'q42': 'd', 'q43': 'a', 'q44': 'd', 'q45': 'b', 'q46': 'c', 'q47': 'b', 'q48': 'c', 'q49': 'd', 'q50': 'd',
+        'q51': 'b', 'q52': 'c', 'q53': 'b', 'q54': 'b', 'q55': 'd', 'q56': 'b', 'q57': 'a', 'q58': 'c', 'q59': 'b', 'q60': 'd',
+        'q61': 'c', 'q62': 'b', 'q63': 'b', 'q64': 'b', 'q65': 'b', 'q66': 'b', 'q67': 'd', 'q68': 'c', 'q69': 'b', 'q70': 'a',
+        'q71': 'b', 'q72': 'b', 'q73': 'd', 'q74': 'c', 'q75': 'a', 'q76': 'b', 'q77': 'b', 'q78': 'd', 'q79': 'b', 'q80': 'd',
+        'q81': 'b', 'q82': 'a', 'q83': 'b', 'q84': 'a', 'q85': 'a', 'q86': 'a', 'q87': 'b', 'q88': 'b', 'q89': 'b', 'q90': 'd',
+        'q91': 'd', 'q92': 'd', 'q93': 'b', 'q94': 'a', 'q95': 'b', 'q96': 'a', 'q97': 'c', 'q98': 'b', 'q99': 'b', 'q100': 'b',
+        'q101': 'a', 'q102': 'c', 'q103': 'c', 'q104': 'c', 'q105': 'b', 'q106': 'b', 'q107': 'b', 'q108': 'b', 'q109': 'b', 'q110': 'a',
+        'q111': 'd', 'q112': 'b', 'q113': 'b', 'q114': 'a', 'q115': 'c', 'q116': 'c', 'q117': 'a', 'q118': 'a', 'q119': 'a', 'q120': 'c',
+        'q121': 'a', 'q122': 'b', 'q123': 'a', 'q124': 'a', 'q125': 'b', 'q126': 'b', 'q127': 'b', 'q128': 'b', 'q129': 'c', 'q130': 'b',
+        'q131': 'b', 'q132': 'b', 'q133': 'b', 'q134': 'b', 'q135': 'b'
+    };
+
+    const explanations = {
+        'q1': 'El **Mensaje** es la **unidad de contenido** que un emisor quiere transmitir a un destinatario. Representa la información que se codifica para ser enviada, según la definición del temario.',
+        'q2': 'Según **Escandell-Vidal (2005)**, el acto comunicativo se restringe a **fenómenos intencionales**. Es indispensable la **intencionalidad del emisor** de transmitir un mensaje.',
+        'q3': 'Las variedades **Diatópicas** son las determinadas por aspectos de índole **geográfica** (eje del espacio). Son responsables de las diferencias que definen los **dialectos**.',
+        'q4': 'Los códigos **Complejos** (sistemas) son conjuntos estructurados de señales que se combinan mediante un **conjunto de reglas estables** (reglas de combinación) para formar mensajes a partir de unidades discretas.',
+        'q5': 'El **Canal** se refiere al **medio material** a través del cual se transmite el mensaje (ej. aire, papel, cable). Es el conducto físico por el que circula el mensaje.',
+        'q6': 'El **Contexto** es el conjunto de **conocimientos y creencias compartidas** por los interlocutores, siendo imprescindible para la correcta comprensión del enunciado.',
+        'q7': 'Las variedades **Diafásicas** vienen determinadas por la **situación comunicativa** y el **concepto de adecuación**. Permiten ajustar el estilo y vocabulario al ámbito (el registro).',
+        'q8': 'Los códigos **Simples** se asocian a un conjunto **reducido de señales fijas e invariables** con un conjunto igualmente reducido de mensajes, como el sistema de comunicación de los submarinistas.',
+        'q9': 'Los tres tipos de contexto definidos en el temario son: **Lingüístico** (cotexto), **Situacional** (entorno inmediato) y **Sociocultural** (condicionamientos sociales). **Interpersonal** no figura como un tipo estructural de contexto.',
+        'q10': 'Para Jakobson, es indispensable que emisor y destinatario compartan **al menos una porción del código** para que la comunicación sea operativa, pero no necesariamente la totalidad.',
+        'q11': 'El proceso de **codificación** lo inicia el emisor para pasar del contenido que se pretende comunicar a la **seña** que lo transmite, en virtud de la convención previa.',
+        'q12': 'Las variedades lingüísticas se clasifican como Diacrónica, Diatópica, Diastrática y Diafásica. **Diatónica** no es una de las categorías definidas.',
+        'q13': 'El **Canal** se refiere al conducto físico por el que circula el mensaje; su función es **transmitir** el mensaje por ese conducto material.',
+        'q14': '**Roman Jakobson** desarrolló el modelo de los factores de la comunicación y sus seis funciones del lenguaje asociadas, siendo una herramienta clave para el análisis.',
+        'q15': 'La **Competencia Comunicativa (Hymes)** es la capacidad que permite **adecuar el comportamiento lingüístico** a cuándo hablar, qué decir y en qué circunstancias, y a la competencia lingüística.',
+        'q16': 'El sistema de comunicación de los submarinistas es un **código Simple**, ya que utiliza un conjunto **reducido de señales fijas e invariables**.',
+        'q17': 'El **referente** es la realidad extralingüística a la que se alude. **Escandell-Vidal** lo define también como **representaciones internas** (imagen mental, personal y privada), sean de naturaleza externa o interna.',
+        'q18': 'Los registros **Diafásicos** están determinados por la **situación comunicativa** y el **concepto de adecuación**, por lo que varían según el contexto (formal/informal).',
+        'q19': 'El término **oyente** de Jakobson es sustituido por **receptor** en la terminología moderna, ya que el individuo puede recibir un mensaje sin necesidad de que este sea audible o legible.',
+        'q20': 'El temario afirma que las lenguas son **productos culturales y convencionales** en sus estructuras (a diferencia del lenguaje), visión atribuida a **Reyes**.',
+        'q21': 'El uso de **términos informales** en un chat familiar es un ejemplo de ajuste de **registro** (variedad diafásica) determinada por la situación comunicativa de confianza.',
+        'q22': 'El **Contexto** es el conjunto de conocimientos y creencias que permite la **correcta comprensión** de un enunciado, abarcando elementos imprescindibles para interpretar el mensaje.',
+        'q23': 'El **español estándar** es definido como la lengua que se emplea en contextos **formales, públicos** y en la escuela; es una variedad **culta de registro formal** (variedad diafásica).',
+        'q24': 'La función **Metalingüística** está orientada al **código** (reglas de la lengua), lo cual significa que se usa la lengua para **analizar o hablar de la propia lengua**.',
+        'q25': 'El **Contexto Situacional** incluye **todos los datos accesibles** a los participantes que se encuentran en el **entorno inmediato** (aquí y ahora) del evento comunicativo.',
+        'q26': 'Un **código Simple** se asocia a un conjunto reducido de **señales fijas e invariables** con un conjunto igualmente reducido de mensajes.',
+        'q27': 'Las variedades **Diastráticas** (sociolectos) se fundamentan en factores de índole **social** como la **edad** y el **nivel sociocultural o socioeconómico**.',
+        'q28': 'El **Mensaje** es la unidad de contenido. El objeto del mensaje puede ser el referente (la realidad), incluyendo elementos no verbales o gráficos como **tablas y gráficos**.',
+        'q29': 'Las variedades **Diatópicas** son las determinadas por aspectos de índole **geográfica** (eje del espacio).',
+        'q30': 'El **uso de un registro específico** como el de términos académicos en un congreso es una variación **Diafásica**, determinada por la situación formal y el ámbito laboral.',
+        'q31': 'El **Mensaje** es la unidad de contenido que un emisor quiere transmitir, y esta puede ser de naturaleza **verbal** (oral o escrita) o **noverbal** (gestos).',
+        'q32': 'El **código** es un sistema convencional que **establece emparejamientos constantes entre señales y mensajes** (significados), siendo su función esencial.',
+        'q33': 'El **Contexto** (o referente) es la **realidad extralingüística** a la que el mensaje alude (objeto, emoción, estado de cosas).',
+        'q34': 'El **español estándar** es la lengua que se emplea cuando se busca la **corrección**, siendo utilizada en **contextos formales y públicos** (escuela, medios de comunicación).',
+        'q35': 'El **Canal** es el **medio material** a través del cual se transmite el mensaje. Un mensaje escrito en papel es un soporte material que funciona como canal.',
+        'q36': 'Las variedades **Diacrónicas** provienen de la **consideración histórica** de la lengua, reflejando las modificaciones y alteraciones que sufre a lo largo del **tiempo**.',
+        'q37': 'El **Mensaje** es la **unidad de contenido** que el emisor (hablante) desea transmitir al destinatario (oyente).',
+        'q38': 'El **Contacto** es un elemento doble que incluye el **canal de transmisión** (físico) y la **conexión psicológica** entre los participantes para que permanezcan en comunicación.',
+        'q39': 'El **sociolecto** es una variedad **diastrática** que se distingue por la influencia de factores **sociales** como el **nivel socioeconómico y cultural**.',
+        'q40': 'La función principal del **código** es proveer un **sistema de señales compartidas** (emparejamientos) que permite la codificación y descodificación de mensajes.',
+        'q41': 'El **Contexto Sociocultural** consiste en la configuración de datos que proceden de **condicionamientos sociales y culturales** sobre el comportamiento verbal y su adecuación.',
+        'q42': 'Los códigos **Complejos** (sistemas) están formados a partir de unidades discretas que se combinan mediante **reglas establecidas** (gramática) para generar mensajes complejos e infinitos.',
+        'q43': 'El temario, al definir el Canal, hace referencia a la **RAE** y su concepto de "Conducto físico por el que circula el mensaje", aunque también lo vincula al modelo de Jakobson.',
+        'q44': 'La variedad **Diafásica** (registro) depende de la **situación comunicativa** y el **grado de formalidad** requerido por el entorno.',
+        'q45': 'La función **Metalingüística** (orientada al Código) se activa al usar la lengua para **hablar de aspectos que conciernen a la propia lengua**.',
+        'q46': 'El **Código** es un **sistema convencional** que **establece emparejamientos constantes entre señales y mensajes**.',
+        'q47': 'La variedad **Diacrónica** se basa en la **consideración histórica** de la lengua, ya que describe las **modificaciones a lo largo del tiempo**.',
+        'q48': 'El temario atribuye a **Reyes** la tesis de que las lenguas son **productos culturales y convencionales**.',
+        'q49': 'El **Mensaje** es el elemento que se **modifica** (codifica) para **adaptarse** a las exigencias del código y los contextos socioculturales.',
+        'q50': 'El **Mensaje** puede ser complementado con **gestos no verbales** (componente no verbal) que acompañan a las palabras y transmiten información.',
+        'q51': 'El **código Simple** se asocia a un conjunto reducido y **no variable** de señales y mensajes.',
+        'q52': 'La función **Fática** (orientada al Contacto) busca **establecer, entrar y permanecer en comunicación** y mantener el canal operativo.',
+        'q53': 'La variedad **Diafásica** (registro) se ajusta al **nivel de formalidad** o informalidad determinado por la situación comunicativa.',
+        'q54': '**Jakobson** fue quien introdujo el concepto de las **seis funciones del lenguaje** asociadas a los factores de la comunicación como herramienta de análisis lingüístico.',
+        'q55': 'Los **Elementos Paralingüísticos** son elementos vocales **no lingüísticos** (como la entonación, el ritmo, el timbre, pausas) que **acompañan** a las palabras y matizan el sentido.',
+        'q56': 'La función **Emotiva** (o Expresiva) está centrada en el **Emisor** (hablante) y sirve para expresar sus emociones, actitudes y opiniones.',
+        'q57': 'El **Contexto Lingüístico** (cotexto) está constituido por el **material lingüístico** (palabras) que **precede o sigue** a un enunciado.',
+        'q58': 'El **Contacto** es el vínculo que une el canal de transmisión (físico) y la **conexión psicológica** entre los participantes.',
+        'q59': 'Los códigos **Complejos** (la lengua) requieren que emisor y receptor compartan el sistema de signos para que el mensaje sea comprendido e interpretado.',
+        'q60': 'La variedad **Diastrática** (sociolecto) se fundamenta en factores de índole **social** como la **edad** y el **nivel sociocultural o socioeconómico**.',
+        'q61': 'La función **Conativa** (o Apelativa) está orientada al **Receptor** (oyente/destinatario) para influir en su conducta o persuadirle.',
+        'q62': 'El **Canal** es el **medio material** a través del cual se transmite el mensaje.',
+        'q63': 'La función **Poética** se centra en el **Mensaje** y prioriza la **estructura**, la **forma** y la composición estética del enunciado.',
+        'q64': 'El **Contexto Sociocultural** abarca datos que proceden de **condicionamientos sociales y culturales** sobre el comportamiento verbal y su adecuación.',
+        'q65': 'La **Competencia Comunicativa (Hymes)** es la capacidad de una persona para **adecuar** el comportamiento lingüístico (el lenguaje) a las circunstancias, el contexto y los interlocutores.',
+        'q66': 'El **Mensaje** es la unidad de contenido que puede ser de naturaleza **verbal** (oral o escrita) o **no verbal** (gestual, paralingüístico).',
+        'q67': 'La variedad **Diacrónica** proviene de la **consideración histórica** de la lengua y los **factores históricos** que la modifican a lo largo del tiempo.',
+        'q68': 'La función **Metalingüística** (orientada al Código) se produce al usar la lengua para hablar de la **propia lengua** (sus reglas y funcionamiento).',
+        'q69': 'Un **código Simple** utiliza un conjunto de **señales fijas e invariables** con mensajes igualmente reducidos y fijos.',
+        'q70': 'La función **Emotiva** se centra en el **Emisor** para expresar sus **estados emocionales** y su actitud hacia el referente.',
+        'q71': 'El **Canal** se refiere al **medio físico** o conducto por donde circula el mensaje codificado.',
+        'q72': 'El **Contexto Situacional** incluye **todos los datos accesibles** y observables que se encuentran en el **entorno inmediato** donde ocurre la comunicación.',
+        'q73': 'La variedad **Diatópica** se determina por la **geografía** de los hablantes (eje del espacio).',
+        'q74': 'La función **Metalingüística** (orientada al Código) permite la **interpretación** y el análisis de las reglas del propio sistema lingüístico.',
+        'q75': 'Para que el proceso de comunicación sea **operativo y satisfactorio**, el mensaje requiere un **código común** (parcial o totalmente) al hablante y al oyente.',
+        'q76': 'El **Contexto** abarca los elementos **físicos** (situacional) y los **inmateriales** (conocimientos, creencias compartidas) que son imprescindibles para la comprensión.',
+        'q77': '**Shannon y Weaver** (1949) desarrollaron el modelo matemático y lineal de la comunicación, centrado en la transmisión de información.',
+        'q78': 'La variedad **Diatópica** (geográfica) es responsable de las diferencias **léxicas** y fonéticas según la **región** de procedencia.',
+        'q79': 'La función **Conativa** (o Apelativa) está **enfocada en el Receptor** para buscar una respuesta o modificar su conducta.',
+        'q80': 'El **Mensaje** es la unidad de contenido y puede ser codificado con **señales gráficas** (como emoticonos) además de palabras.',
+        'q81': 'Un **código Complejo** (o sistema) se define por la **combinación de unidades discretas** a través de **reglas estables** para crear mensajes nuevos e ilimitados.',
+        'q82': 'La variedad **Diafásica** (registro) depende de la **formalidad** y la naturaleza del evento comunicativo.',
+        'q83': 'La función **Referencial** se enfoca en el **Contenido informativo** o el referente (la realidad extralingüística) al que se alude.',
+        'q84': 'El **Canal** es el **medio físico** (materia) de transmisión, mientras que el **Contexto** es el conjunto de **datos ambientales** y saberes (marco de referencia).',
+        'q85': 'El **Contacto** es el vínculo que une al **emisor y al receptor** y garantiza su conexión psicológica y la apertura del canal.',
+        'q86': 'La variedad **Diastrática** (sociolecto) se basa en **diferencias socioculturales** como el nivel educativo, la edad o el estrato social.',
+        'q87': 'La función **Fática** (orientada al Contacto) está dirigida al **Canal** para verificar, establecer y mantener la comunicación ("¿Me escuchas?").',
+        'q88': 'El **Contexto Sociocultural** incluye los **conocimientos y creencias compartidos** (datos procedentes de condicionamientos sociales y culturales) necesarios para interpretar el mensaje.',
+        'q89': 'La función **Emotiva** (o Expresiva) se centra en el **Emisor** para manifestar sus **sentimientos, emociones y subjetividad**.',
+        'q90': 'El **Mensaje** incluye variables **lingüísticas** (palabras) y **no lingüísticas** (gestos, paralenguaje), siendo el contenido total del acto.',
+        'q91': 'El **contexto diacrónico** (analizado a través de la variedad diacrónica) se refiere al estudio de los aspectos lingüísticos a lo largo del **tiempo** (históricos).',
+        'q92': 'El **Mensaje** es la **unidad de contenido** que se transmite y, por ende, es un elemento **común** a todos los actos comunicativos.',
+        'q93': 'El documento atribuye a **Reyes** la descripción del lenguaje como un fenómeno **cultural** y convencional que evoluciona.',
+        'q94': 'La función **Poética** se centra en el **Mensaje** para describir o destacar su **estructura** y **estética** (forma).',
+        'q95': 'El **Contexto Sociocultural** facilita la **interpretación** adecuada de los mensajes al proporcionar el marco de **normas y saberes culturales** compartidos.',
+        'q96': 'El **Canal** (medio material) es el elemento que **asegura la transmisión** física de las señales que componen el mensaje.',
+        'q97': 'La variedad **Diatópica** (geográfica) incluye las **expresiones propias de una región específica** (dialecto).',
+        'q98': 'La función **Fática** tiene como propósito **regular la interacción social** y verificar el contacto comunicativo.',
+        'q99': 'Un **código Simple** utiliza un conjunto reducido de **gestos o símbolos no lingüísticos** fijos e invariables.',
+        'q100': 'El **Contacto** es el elemento de Jakobson que establece el **vínculo (conexión física y psicológica)** para que la comunicación entre emisor y receptor sea posible.',
+        'q101': 'El **Código** es el sistema convencional que establece los emparejamientos necesarios para la **codificación y decodificación** del mensaje.',
+        'q102': 'La función **Metalingüística** (orientada al Código) se utiliza para **hablar de la propia lengua** (reglas, gramática, vocabulario).',
+        'q103': 'La variedad **Diacrónica** se refiere a los **cambios en la lengua a lo largo del tiempo** (consideración histórica).',
+        'q104': 'El **Mensaje** puede incluir **información implícita**, ya que esta tiende a deducirse del contexto compartido.',
+        'q105': '**Jakobson** fue el autor que **vinculó las funciones del lenguaje** (emotiva, referencial, etc.) **a los elementos** del proceso comunicativo.',
+        'q106': 'La función **Conativa** (o Apelativa) busca **captar la atención** y dirigir la respuesta del **Receptor** (persuasión).',
+        'q107': 'El **Contexto** es el conjunto de **conocimientos y creencias compartidas** por los interlocutores que es pertinente para la interpretación del mensaje.',
+        'q108': 'La variedad **Diafásica** (registro) se adapta al **grado de formalidad** (situación) de la interacción.',
+        'q109': 'La función **Emotiva** enfatiza las **emociones, actitudes y la subjetividad** del **Emisor**.',
+        'q110': 'El **Mensaje** es el contenido que se materializa mediante **palabras, imágenes o gestos** (signos codificados).',
+        'q111': 'La variedad **Diatópica** se define por la variación de índole **geográfica** (eje del espacio).',
+        'q112': 'El **Contexto Situacional** incluye **todos los datos accesibles** y observables que se encuentran en el **entorno inmediato** donde ocurre la comunicación.',
+        'q113': 'La función **Metalingüística** se centra en el **código utilizado** para explicarlo o analizarlo.',
+        'q114': 'La variedad **Diastrática** (sociolecto) incluye expresiones específicas de una **clase social** (estrato social) o nivel sociocultural.',
+        'q115': 'El **Mensaje** es la unidad de contenido que incluye señales **verbales** y **no verbales**.',
+        'q116': 'La variedad **Diacrónica** se refiere a los **cambios históricos** que experimenta la lengua a lo largo del tiempo.',
+        'q117': 'La función **Fática** (orientada al Contacto) busca **mantener la comunicación** o la conexión con el interlocutor.',
+        'q118': 'El **Canal** se define como el **medio físico** por donde circula el mensaje.',
+        'q119': 'La función **Poética** destaca la **forma estética** o la estructura del **Mensaje**.',
+        'q120': 'El **Canal** es el **medio material** que **asegura la transmisión** adecuada del mensaje.',
+        'q121': 'La función **Referencial** se utiliza para **informar objetivamente sobre el contexto** (el referente).',
+        'q122': 'El **Contexto Sociocultural** abarca los **condicionamientos sociales y culturales** (normas culturales) que influyen en el comportamiento verbal.',
+        'q123': 'La función **Metalingüística** (orientada al Código) busca **analizar y organizar** la estructura del mensaje según las reglas de la lengua.',
+        'q124': 'La variedad **Diastrática** (sociolecto) está determinada por el **nivel sociocultural** (estrato social, educación).',
+        'q125': 'El **Contacto** es el elemento que incluye el **canal físico** y la **conexión psicológica** entre los interlocutores.',
+        'q126': 'La función **Poética** se orienta al **Mensaje** para **analizar la estructura** y sus cualidades formales.',
+        'q127': 'La variedad **Diacrónica** está influida por **factores históricos** (eje del tiempo).',
+        'q128': 'El **Código** (el sistema de signos compartido) es esencial para que el receptor pueda **interpretar** (decodificar) el mensaje.',
+        'q129': 'El **Contexto Situacional** incluye **datos observables** en el **entorno inmediato** del evento comunicativo.',
+        'q130': 'La función **Fática** enfatiza la **relación entre interlocutores** al verificar que el contacto comunicativo está activo.',
+        'q131': 'El **Mensaje** es la unidad de contenido que puede incluir **gestos y señales gráficas** (no verbales).',
+        'q132': 'Un **código Complejo** (ej. la lengua) se basa en la **combinación de unidades** mediante **reglas establecidas** para crear mensajes complejos.',
+        'q133': 'La función **Conativa** describe la intención de **persuadir** o influir en el receptor.',
+        'q134': 'La variedad **Diastrática** (sociolecto) está influenciada por el **nivel socioeconómico** (factor social).',
+        'q135': 'La función **Metalingüística** se orienta hacia el **código compartido** para analizar el sistema de signos utilizado.',
+    };
+
+    const allQuestions = [
+        { num: 1, text: '¿Qué es un mensaje en el proceso de comunicación?', options: ['a) El canal por donde se transmite la información.', 'b) La unidad de contenido que un emisor quiere transmitir a un destinatario.', 'c) El contexto en el que ocurre la comunicación.', 'd) El código empleado para transmitir señales.'] },
+        { num: 2, text: 'Según Escandell-Vidal, ¿qué requisito es indispensable para que haya comunicación?', options: ['a) La existencia de un contexto.', 'b) La intencionalidad del emisor.', 'c) La presencia de un receptor.', 'd) El uso de un código lingüístico.'] },
+        { num: 3, text: '¿Qué tipo de variedad lingüística se refiere a diferencias provocadas por aspectos geográficos?', options: ['a) Diastráticas.', 'b) Diacrónicas.', 'c) Diafásicas.', 'd) Diatópicas.'] },
+        { num: 4, text: '¿Cuál de las siguientes afirmaciones describe un código complejo?', options: ['a) Asociaciones simples y limitadas entre señales y mensajes.', 'b) Uso de reglas establecidas para combinar unidades discretas.', 'c) Solo permite comunicación no verbal.', 'd) Exclusivamente lingüístico.'] },
+        { num: 5, text: 'En el modelo de comunicación de Jakobson, el canal se define como:', options: ['a) El emisor de la información.', 'b) El medio físico a través del cual se transmite el mensaje.', 'c) El destinatario del mensaje.', 'd) El contexto en el que ocurre la comunicación.'] },
+        { num: 6, text: '¿Qué elemento incluye el conocimiento compartido entre los interlocutores en un evento comunicativo?', options: ['a) Código.', 'b) Canal.', 'c) Contexto.', 'd) Mensaje.'] },
+        { num: 7, text: 'Según el documento, ¿qué variedad lingüística se ajusta a las circunstancias del acto comunicativo?', options: ['a) Diacrónicas.', 'b) Diafásicas.', 'c) Diatópicas.', 'd) Diastráticas.'] },
+        { num: 8, text: '¿Cuál es un ejemplo de un código simple?', options: ['a) El uso del español estándar.', 'b) Los signos de comunicación de los submarinistas.', 'c) La combinación de morfemas en una lengua.', 'd) Los dialectos regionales.'] },
+        { num: 9, text: '¿Qué factor NO se considera un tipo de contexto según el documento?', options: ['a) Lingüístico.', 'b) Situacional.', 'c) Interpersonal.', 'd) Sociocultural.'] },
+        { num: 10, text: 'Según el modelo de Jakobson, el código debe ser:', options: ['a) Exclusivamente lingüístico.', 'b) Completamente compartido por emisor y receptor.', 'c) Al menos parcialmente compartido por emisor y receptor.', 'd) Universal para garantizar la comunicación.'] },
+        { num: 11, text: '¿Qué significa "codificación" en el proceso comunicativo?', options: ['a) Interpretar un mensaje recibido.', 'b) Establecer la conexión psicológica entre interlocutores.', 'c) Convertir el contenido en señales siguiendo un código.', 'd) Contextualizar el mensaje según el entorno.'] },
+        { num: 12, text: '¿Cuál de estas NO es una variedad lingüística mencionada en el documento?', options: ['a) Diacrónica.', 'b) Diafásica.', 'c) Diatónica.', 'd) Diastrática.'] },
+        { num: 13, text: '¿Qué función cumple el canal en el acto comunicativo?', options: ['a) Transmitir el mensaje por un conducto físico.', 'b) Proveer un código común.', 'c) Establecer el contacto psicológico entre los interlocutores.', 'd) Brindar un contexto al mensaje.'] },
+        { num: 14, text: '¿Qué autor desarrolló un modelo basado en funciones del lenguaje?', options: ['a) Shannon.', 'b) Hymes.', 'c) Jakobson.', 'd) Bühler.'] },
+        { num: 15, text: '¿Qué elemento asegura la adecuación del comportamiento lingüístico al contexto?', options: ['a) La competencia lingüística.', 'b) La competencia comunicativa.', 'c) El canal.', 'd) El contexto sociocultural.'] },
+        { num: 16, text: '¿Qué tipo de código emplean los submarinistas?', options: ['a) Complejo.', 'b) Simple.', 'c) Lingüístico.', 'd) Contextual.'] },
+        { num: 17, text: '¿Cuál de los siguientes elementos puede ser un referente?', options: ['a) Emisor.', 'b) Una representación interna.', 'c) Canal.', 'd) Contacto.'] },
+        { num: 18, text: '¿Qué característica distingue a los registros diafásicos?', options: ['a) Están influenciados por el género y la edad.', 'b) Están determinados por el contexto social.', 'c) Varían según la situación comunicativa.', 'd) Son uniformes a lo largo del tiempo.'] },
+        { num: 19, text: 'Según el documento, ¿qué término reemplaza al "oyente" en el modelo de Jakobson?', options: ['a) Receptor.', 'b) Destinatario.', 'c) Emisor.', 'd) Contexto.'] },
+        { num: 20, text: '¿Qué autor menciona que la lengua es un producto cultural y convencional?', options: ['a) Jakobson.', 'b) Reyes.', 'c) Shannon.', 'd) Hymes.'] },
+        { num: 21, text: '¿Qué ejemplo describe una situación comunicativa diafásica?', options: ['a) Diferencias en el acento entre regiones.', 'b) El uso de términos informales en un chat familiar.', 'c) Cambios en la lengua a lo largo de los siglos.', 'd) Expresiones propias de un grupo etario.'] },
+        { num: 22, text: '¿Qué elemento permite interpretar un mensaje de manera completa?', options: ['a) El canal.', 'b) El contexto.', 'c) El emisor.', 'd) El código.'] },
+        { num: 23, text: '¿Qué variedad lingüística caracteriza el español estándar?', options: ['a) Dialecto.', 'b) Registro formal y culto.', 'c) Sociolecto.', 'd) Lengua diacrónica.'] },
+        { num: 24, text: '¿Qué función lingüística analiza el código mismo?', options: ['a) Emotiva.', 'b) Conativa.', 'c) Metalingüística.', 'd) Fática.'] },
+        { num: 25, text: '¿Qué se entiende por contexto situacional?', options: ['a) El conjunto de palabras que anteceden a un enunciado.', 'b) Los elementos del entorno inmediato del evento comunicativo.', 'c) Los conocimientos compartidos entre interlocutores.', 'd) La adecuación del lenguaje al ámbito formal.'] },
+        { num: 26, text: '¿Qué característica distingue a un código simple?', options: ['a) Usa señales limitadas e invariables.', 'b) Combina señales mediante reglas complejas.', 'c) Es exclusivo de la comunicación escrita.', 'd) Requiere de contexto para interpretarse.'] },
+        { num: 27, text: '¿Qué variedad lingüística incluye factores como edad y nivel sociocultural?', options: ['a) Diacrónica.', 'b) Diatópica.', 'c) Diastrática.', 'd) Diafásica.'] },
+        { num: 28, text: '¿Qué elemento del proceso comunicativo puede incluir tablas y gráficos?', options: ['a) Mensaje.', 'b) Código.', 'c) Canal.', 'd) Contexto.'] },
+        { num: 29, text: '¿Qué variedad lingüística está influida por la geografía?', options: ['a) Diacrónica.', 'b) Diatópica.', 'c) Diafásica.', 'd) Diastrática.'] },
+        { num: 30, text: '¿Cuál es un ejemplo de un registro diafásico?', options: ['a) Uso de términos específicos en un congreso académico.', 'b) Diferencias fonéticas entre regiones.', 'c) Cambios históricos en una lengua.', 'd) Variaciones lingüísticas entre grupos de edad.'] },
+        { num: 31, text: 'Según el documento, ¿qué elemento del modelo de Jakobson puede ser verbal o no verbal?', options: ['a) Mensaje.', 'b) Canal.', 'c) Código.', 'd) Contexto.'] },
+        { num: 32, text: '¿Qué función tiene el código en la comunicación?', options: ['a) Servir de medio físico para transmitir mensajes.', 'b) Establecer emparejamientos entre señales y mensajes.', 'c) Generar el contexto para interpretar un mensaje.', 'd) Proveer la conexión psicológica entre interlocutores.'] },
+        { num: 33, text: '¿Qué elemento del acto comunicativo representa la realidad extralingüística?', options: ['a) Mensaje.', 'b) Contexto.', 'c) Código.', 'd) Canal.'] },
+        { num: 34, text: '¿Qué concepto describe la lengua que empleamos en contextos formales y públicos?', options: ['a) Sociolecto.', 'b) Dialecto.', 'c) Español estándar.', 'd) Registro informal.'] },
+        { num: 35, text: '¿Cuál es un ejemplo de canal en el modelo de comunicación?', options: ['a) Las emociones del emisor.', 'b) Un mensaje escrito en papel.', 'c) La interpretación del mensaje.', 'd) El conocimiento previo del receptor.'] },
+        { num: 36, text: '¿Qué variedad lingüística se altera con el tiempo?', options: ['a) Diafásica.', 'b) Diatópica.', 'c) Diacrónica.', 'd) Diastrática.'] },
+        { num: 37, text: '¿Cuál es el elemento de la comunicación que refiere al contenido que el emisor desea transmitir?', options: ['a) Código.', 'b) Mensaje.', 'c) Canal.', 'd) Contexto.'] },
+        { num: 38, text: 'Según Jakobson, ¿qué elemento se relaciona con el canal físico y la conexión psicológica?', options: ['a) Contacto.', 'b) Contexto.', 'c) Código.', 'd) Emisor.'] },
+        { num: 39, text: '¿Qué característica distingue un sociolecto?', options: ['a) Se basa en factores geográficos.', 'b) Está influido por el nivel socioeconómico y cultural.', 'c) Evoluciona con el tiempo.', 'd) Cambia según el contexto comunicativo.'] },
+        { num: 40, text: '¿Qué función principal tiene el código en el proceso de comunicación?', options: ['a) Transmitir emociones.', 'b) Proveer un sistema de señales compartidas.', 'c) Crear vínculos entre interlocutores.', 'd) Facilitar el contexto situacional.'] },
+        { num: 41, text: '¿Qué elemento incluye la interacción entre lenguaje y cultura en un acto comunicativo?', options: ['a) Contexto sociocultural.', 'b) Contexto situacional.', 'c) Código lingüístico.', 'd) Canal.'] },
+        { num: 42, text: '¿Qué tipo de código permite combinaciones complejas mediante reglas establecidas?', options: ['a) Código simple.', 'b) Código contextual.', 'c) Código lingüístico.', 'd) Código complejo.'] },
+        { num: 43, text: '¿Qué autor definió el canal como "conducto físico por el que circula el mensaje"?', options: ['a) Jakobson.', 'b) Escandell-Vidal.', 'c) Shannon y Weaver.', 'd) Reyes.'] },
+        { num: 44, text: '¿Qué tipo de variedad lingüística depende de la formalidad del entorno?', options: ['a) Diacrónica.', 'b) Diatópica.', 'c) Diastrática.', 'd) Diafásica.'] },
+        { num: 45, text: '¿Qué función del lenguaje describe situaciones donde se utiliza la lengua para hablar de la lengua misma?', options: ['a) Emotiva.', 'b) Metalingüística.', 'c) Conativa.', 'd) Fática.'] },
+        { num: 46, text: '¿Qué elemento del acto comunicativo se describe como un sistema convencional que empareja señales y mensajes?', options: ['a) Canal.', 'b) Mensaje.', 'c) Código.', 'd) Contexto.'] },
+        { num: 47, text: '¿Qué tipo de variedad lingüística se basa en la evolución de las lenguas a lo largo de la historia?', options: ['a) Diastrática.', 'b) Diacrónica.', 'c) Diafásica.', 'd) Diatópica.'] },
+        { num: 48, text: '¿Qué autor propuso que el lenguaje es un producto cultural y convencional?', options: ['a) Hymes.', 'b) Jakobson.', 'c) Reyes.', 'd) Escandell-Vidal.'] },
+        { num: 49, text: '¿Qué elemento se modifica en un mensaje para adaptarse a diferentes contextos socioculturales?', options: ['a) El canal.', 'b) El emisor.', 'c) El código.', 'd) El mensaje.'] },
+        { num: 50, text: '¿Qué elemento del proceso comunicativo puede ser complementado con gestos no verbales?', options: ['a) Código.', 'b) Contexto.', 'c) Canal.', 'd) Mensaje.'] },
+        { num: 51, text: '¿Qué tipo de código emplea emparejamientos limitados y no variables?', options: ['a) Código complejo.', 'b) Código simple.', 'c) Código sociocultural.', 'd) Código lingüístico.'] },
+        { num: 52, text: '¿Qué función del lenguaje, según Jakobson, busca establecer y mantener la comunicación?', options: ['a) Referencial.', 'b) Conativa.', 'c) Fática.', 'd) Emotiva.'] },
+        { num: 53, text: '¿Qué variedad lingüística se ajusta al nivel de formalidad o informalidad de una situación?', options: ['a) Diatópica.', 'b) Diafásica.', 'c) Diastrática.', 'd) Diacrónica.'] },
+        { num: 54, text: '¿Qué autor introdujo el concepto de funciones del lenguaje como una herramienta analítica?', options: ['a) Shannon.', 'b) Jakobson.', 'c) Hymes.', 'd) Bühler.'] },
+        { num: 55, text: '¿Qué término describe los elementos no lingüísticos que complementan un mensaje?', options: ['a) Código.', 'b) Contexto.', 'c) Mensaje.', 'd) Elementos paralingüísticos.'] },
+        { num: 56, text: 'Según Jakobson, ¿qué función está centrada en el emisor?', options: ['a) Referencial.', 'b) Emotiva.', 'c) Conativa.', 'd) Poética.'] },
+        { num: 57, text: '¿Qué tipo de contexto incluye el material lingüístico que rodea un enunciado?', options: ['a) Lingüístico.', 'b) Situacional.', 'c) Sociocultural.', 'd) Referencial.'] },
+        { num: 58, text: '¿Qué elemento de la comunicación alude a la conexión psicológica entre emisor y receptor?', options: ['a) Canal.', 'b) Contexto.', 'c) Contacto.', 'd) Mensaje.'] },
+        { num: 59, text: '¿Qué tipo de código requiere un conocimiento compartido para ser entendido?', options: ['a) Código simple.', 'b) Código complejo.', 'c) Código no verbal.', 'd) Código general.'] },
+        { num: 60, text: '¿Qué variedad lingüística está influenciada por factores sociales como el nivel educativo?', options: ['a) Diafásica.', 'b) Diacrónica.', 'c) Diatópica.', 'd) Diastrática.'] },
+        { num: 61, text: '¿Qué función del lenguaje está orientada hacia el receptor?', options: ['a) Emotiva.', 'b) Referencial.', 'c) Conativa.', 'd) Fática.'] },
+        { num: 62, text: '¿Qué característica define al canal en la comunicación?', options: ['a) La conexión psicológica entre los participantes.', 'b) El medio material por el cual circula el mensaje.', 'c) La codificación de las señales.', 'd) El contexto situacional.'] },
+        { num: 63, text: '¿Qué función del lenguaje se centra en la estructura del mensaje?', options: ['a) Referencial.', 'b) Poética.', 'c) Fática.', 'd) Conativa.'] },
+        { num: 64, text: '¿Qué tipo de contexto refiere a normas sociales y culturales que afectan el mensaje?', options: ['a) Contexto situacional.', 'b) Contexto sociocultural.', 'c) Contexto lingüístico.', 'd) Contexto pragmático.'] },
+        { num: 65, text: '¿Qué concepto incluye la capacidad para ajustar el lenguaje según el contexto y los interlocutores?', options: ['a) Competencia lingüística.', 'b) Competencia comunicativa.', 'c) Contexto situacional.', 'd) Código complejo.'] },
+        { num: 66, text: '¿Qué elemento del modelo de Jakobson incluye tanto lo verbal como lo no verbal?', options: ['a) Código.', 'b) Mensaje.', 'c) Canal.', 'd) Contexto.'] },
+        { num: 67, text: '¿Qué variedad lingüística se caracteriza por la influencia de factores históricos en el lenguaje?', options: ['a) Diastrática.', 'b) Diatópica.', 'c) Diafásica.', 'd) Diacrónica.'] },
+        { num: 68, text: '¿Qué función del lenguaje se orienta al código mismo?', options: ['a) Referencial.', 'b) Fática.', 'c) Metalingüística.', 'd) Emotiva.'] },
+        { num: 69, text: '¿Qué característica define a un código simple?', options: ['a) Su estructura está basada en combinaciones complejas.', 'b) Usa señales fijas e invariables.', 'c) Requiere de contexto sociocultural para interpretarse.', 'd) Es exclusivo de la comunicación escrita.'] },
+        { num: 70, text: '¿Qué función del lenguaje busca expresar los estados emocionales del emisor?', options: ['a) Emotiva.', 'b) Conativa.', 'c) Referencial.', 'd) Poética.'] },
+        { num: 71, text: '¿Qué elemento del acto comunicativo representa el medio físico por donde circula el mensaje?', options: ['a) Contexto.', 'b) Canal.', 'c) Código.', 'd) Contacto.'] },
+        { num: 72, text: '¿Qué tipo de contexto incluye datos accesibles en el entorno inmediato?', options: ['a) Contexto lingüístico.', 'b) Contexto situacional.', 'c) Contexto sociocultural.', 'd) Contexto referencial.'] },
+        { num: 73, text: '¿Qué variedad lingüística está determinada por la geografía de los hablantes?', options: ['a) Diacrónica.', 'b) Diafásica.', 'c) Diastrática.', 'd) Diatópica.'] },
+        { num: 74, text: '¿Qué función del lenguaje permite la interpretación de un código?', options: ['a) Conativa.', 'b) Emotiva.', 'c) Metalingüística.', 'd) Poética.'] },
+        { num: 75, text: 'Según Jakobson, ¿qué elemento es esencial para una comunicación satisfactoria?', options: ['a) Código completamente compartido.', 'b) Canal no material.', 'c) Contexto extralingüístico.', 'd) Conexión psicológica entre interlocutores.'] },
+        { num: 76, text: 'Según el documento, ¿qué elemento de la comunicación puede ser físico o inmaterial?', options: ['a) Código.', 'b) Contexto.', 'c) Canal.', 'd) Contacto.'] },
+        { num: 77, text: '¿Qué autor desarrolló un modelo matemático de la comunicación?', options: ['a) Jakobson.', 'b) Shannon y Weaver.', 'c) Hymes.', 'd) Bühler.'] },
+        { num: 78, text: '¿Qué variedad lingüística incluye diferencias en el léxico según la región?', options: ['a) Diafásica.', 'b) Diacrónica.', 'c) Diastrática.', 'd) Diatópica.'] },
+        { num: 79, text: '¿Qué función del lenguaje describe un mensaje enfocado en el receptor?', options: ['a) Referencial.', 'b) Conativa.', 'c) Emotiva.', 'd) Poética.'] },
+        { num: 80, text: '¿Qué elemento del acto comunicativo puede implicar señales gráficas, como emoticonos?', options: ['a) Código.', 'b) Canal.', 'c) Contexto.', 'd) Mensaje.'] },
+        { num: 81, text: '¿Qué tipo de código permite combinaciones de elementos básicos para crear mensajes complejos?', options: ['a) Simple.', 'b) Complejo.', 'c) Situacional.', 'd) Referencial.'] },
+        { num: 82, text: '¿Qué variedad lingüística depende de la formalidad del evento comunicativo?', options: ['a) Diafásica.', 'b) Diastrática.', 'c) Diacrónica.', 'd) Diatópica.'] },
+        { num: 83, text: '¿Qué función del lenguaje se enfoca en el contenido informativo del mensaje?', options: ['a) Poética.', 'b) Referencial.', 'c) Conativa.', 'd) Metalingüística.'] },
+        { num: 84, text: '¿Qué característica diferencia a un canal de un contexto en la comunicación?', options: ['a) El canal se centra en el medio físico, mientras que el contexto incluye datos ambientales.', 'b) Ambos representan medios físicos para transmitir mensajes.', 'c) El contexto es exclusivo del lenguaje verbal.', 'd) El canal define la conexión emocional entre interlocutores.'] },
+        { num: 85, text: 'Según Jakobson, ¿qué elemento incluye al emisor y al receptor?', options: ['a) Contacto.', 'b) Contexto.', 'c) Código.', 'd) Mensaje.'] },
+        { num: 86, text: '¿Qué variedad lingüística se basa en diferencias socioculturales?', options: ['a) Diastrática.', 'b) Diafásica.', 'c) Diatópica.', 'd) Diacrónica.'] },
+        { num: 87, text: '¿Qué función del lenguaje está orientada al canal de comunicación?', options: ['a) Emotiva.', 'b) Fática.', 'c) Conativa.', 'd) Metalingüística.'] },
+        { num: 88, text: '¿Qué elemento del acto comunicativo incluye conocimientos compartidos por los interlocutores?', options: ['a) Código.', 'b) Contexto sociocultural.', 'c) Canal.', 'd) Contacto.'] },
+        { num: 89, text: '¿Qué función del lenguaje, según Jakobson, se centra en la expresión de sentimientos?', options: ['a) Referencial.', 'b) Emotiva.', 'c) Conativa.', 'd) Fática.'] },
+        { num: 90, text: '¿Qué elemento de la comunicación incluye variables lingüísticas y no lingüísticas?', options: ['a) Contexto.', 'b) Código.', 'c) Canal.', 'd) Mensaje.'] },
+        { num: 91, text: '¿Qué tipo de contexto analiza aspectos históricos de una lengua?', options: ['a) Lingüístico.', 'b) Situacional.', 'c) Sociocultural.', 'd) Diacrónico.'] },
+        { num: 92, text: 'Según el documento, ¿qué elemento es común a todos los actos comunicativos?', options: ['a) Código.', 'b) Canal.', 'c) Contexto.', 'd) Mensaje.'] },
+        { num: 93, text: '¿Qué autor describió la evolución del lenguaje como un fenómeno cultural?', options: ['a) Jakobson.', 'b) Reyes.', 'c) Escandell-Vidal.', 'd) Shannon.'] },
+        { num: 94, text: '¿Qué función del lenguaje describe la estructura y estética de un mensaje?', options: ['a) Poética.', 'b) Emotiva.', 'c) Referencial.', 'd) Conativa.'] },
+        { num: 95, text: '¿Qué elemento facilita la interpretación de mensajes en un entorno cultural específico?', options: ['a) Canal.', 'b) Contexto sociocultural.', 'c) Código.', 'd) Contacto.'] },
+        { num: 96, text: '¿Qué elemento asegura la transmisión de un mensaje en un acto comunicativo?', options: ['a) Canal.', 'b) Mensaje.', 'c) Contacto.', 'd) Contexto.'] },
+        { num: 97, text: '¿Qué variedad lingüística incluye expresiones propias de una región específica?', options: ['a) Diastrática.', 'b) Diacrónica.', 'c) Diatópica.', 'd) Diafásica.'] },
+        { num: 98, text: '¿Qué función del lenguaje tiene como propósito regular la interacción social?', options: ['a) Conativa.', 'b) Fática.', 'c) Emotiva.', 'd) Metalingüística.'] },
+        { num: 99, text: '¿Qué tipo de código puede incluir gestos o símbolos no lingüísticos?', options: ['a) Complejo.', 'b) Simple.', 'c) Referencial.', 'd) Situacional.'] },
+        { num: 100, text: 'Según Jakobson, ¿qué elemento permite la comunicación entre un emisor y un receptor?', options: ['a) Canal.', 'b) Contacto.', 'c) Código.', 'd) Contexto.'] },
+        { num: 101, text: '¿Qué elemento de la comunicación incluye la codificación y decodificación de mensajes?', options: ['a) Código.', 'b) Contexto.', 'c) Canal.', 'd) Mensaje.'] },
+        { num: 102, text: '¿Qué función del lenguaje se utiliza para hablar de la propia lengua?', options: ['a) Poética.', 'b) Referencial.', 'c) Metalingüística.', 'd) Conativa.'] },
+        { num: 103, text: '¿Qué variedad lingüística incluye cambios en la lengua a lo largo del tiempo?', options: ['a) Diatópica.', 'b) Diastrática.', 'c) Diacrónica.', 'd) Diafásica.'] },
+        { num: 104, text: '¿Qué elemento del acto comunicativo puede incluir información implícita?', options: ['a) Contexto.', 'b) Canal.', 'c) Mensaje.', 'd) Contacto.'] },
+        { num: 105, text: '¿Qué autor vinculó las funciones del lenguaje a los elementos del proceso comunicativo?', options: ['a) Hymes.', 'b) Jakobson.', 'c) Shannon.', 'd) Escandell-Vidal.'] },
+        { num: 106, text: '¿Qué función del lenguaje busca captar la atención del receptor?', options: ['a) Referencial.', 'b) Conativa.', 'c) Fática.', 'd) Poética.'] },
+        { num: 107, text: '¿Qué elemento del modelo de Jakobson incluye conocimientos compartidos por los interlocutores?', options: ['a) Código.', 'b) Contexto.', 'c) Canal.', 'd) Contacto.'] },
+        { num: 108, text: '¿Qué tipo de variedad lingüística se adapta al grado de formalidad de la situación?', options: ['a) Diacrónica.', 'b) Diafásica.', 'c) Diastrática.', 'd) Diatópica.'] },
+        { num: 109, text: '¿Qué función del lenguaje enfatiza las emociones del emisor?', options: ['a) Conativa.', 'b) Emotiva.', 'c) Referencial.', 'd) Fática.'] },
+        { num: 110, text: '¿Qué elemento del proceso comunicativo puede estar formado por palabras, imágenes o gestos?', options: ['a) Mensaje.', 'b) Canal.', 'c) Contexto.', 'd) Código.'] },
+        { num: 111, text: '¿Qué variedad lingüística está influida por la geografía de los hablantes?', options: ['a) Diafásica.', 'b) Diacrónica.', 'c) Diastrática.', 'd) Diatópica.'] },
+        { num: 112, text: '¿Qué tipo de contexto incluye el entorno inmediato donde ocurre la comunicación?', options: ['a) Lingüístico.', 'b) Situacional.', 'c) Sociocultural.', 'd) Extralingüístico.'] },
+        { num: 113, text: '¿Qué función del lenguaje se centra en el código utilizado?', options: ['a) Poética.', 'b) Metalingüística.', 'c) Fática.', 'd) Referencial.'] },
+        { num: 114, text: '¿Qué tipo de variedad lingüística incluye expresiones específicas de una clase social?', options: ['a) Diastrática.', 'b) Diatópica.', 'c) Diafásica.', 'd) Diacrónica.'] },
+        { num: 115, text: '¿Qué elemento del acto comunicativo incluye tanto señales verbales como no verbales?', options: ['a) Código.', 'b) Contexto.', 'c) Mensaje.', 'd) Canal.'] },
+        { num: 116, text: '¿Qué variedad lingüística describe cambios históricos en la lengua?', options: ['a) Diastrática.', 'b) Diafásica.', 'c) Diacrónica.', 'd) Diatópica.'] },
+        { num: 117, text: '¿Qué función del lenguaje busca mantener la comunicación entre interlocutores?', options: ['a) Fática.', 'b) Conativa.', 'c) Emotiva.', 'd) Referencial.'] },
+        { num: 118, text: '¿Qué característica define a un canal en la comunicación?', options: ['a) Es el medio físico por donde circula el mensaje.', 'b) Incluye los conocimientos compartidos entre interlocutores.', 'c) Determina la adecuación del mensaje al contexto.', 'd) Es exclusivo de la comunicación verbal.'] },
+        { num: 119, text: '¿Qué función del lenguaje destaca la forma estética del mensaje?', options: ['a) Poética.', 'b) Emotiva.', 'c) Referencial.', 'd) Conativa.'] },
+        { num: 120, text: '¿Qué elemento asegura la transmisión adecuada del mensaje en un acto comunicativo?', options: ['a) Contexto.', 'b) Contacto.', 'c) Canal.', 'd) Mensaje.'] },
+        { num: 121, text: '¿Qué función del lenguaje describe la intención de informar sobre el contexto?', options: ['a) Referencial.', 'b) Conativa.', 'c) Emotiva.', 'd) Fática.'] },
+        { num: 122, text: '¿Qué tipo de contexto incluye normas culturales y sociales?', options: ['a) Situacional.', 'b) Sociocultural.', 'c) Lingüístico.', 'd) Extralingüístico.'] },
+        { num: 123, text: '¿Qué función del lenguaje busca organizar el mensaje según el código?', options: ['a) Metalingüística.', 'b) Poética.', 'c) Referencial.', 'd) Fática.'] },
+        { num: 124, text: '¿Qué variedad lingüística está determinada por el nivel sociocultural?', options: ['a) Diastrática.', 'b) Diafásica.', 'c) Diatópica.', 'd) Diacrónica.'] },
+        { num: 125, text: '¿Qué elemento incluye el canal físico y la conexión psicológica en un acto comunicativo?', options: ['a) Código.', 'b) Contacto.', 'c) Contexto.', 'd) Mensaje.'] },
+        { num: 126, text: '¿Qué función del lenguaje analiza la estructura del mensaje?', options: ['a) Emotiva.', 'b) Poética.', 'c) Referencial.', 'd) Conativa.'] },
+        { num: 127, text: '¿Qué variedad lingüística está influida por factores históricos?', options: ['a) Diastrática.', 'b) Diacrónica.', 'c) Diafásica.', 'd) Diatópica.'] },
+        { num: 128, text: '¿Qué elemento del modelo de Jakobson asegura la interpretación del mensaje?', options: ['a) Contacto.', 'b) Código.', 'c) Canal.', 'd) Contexto.'] },
+        { num: 129, text: '¿Qué tipo de contexto incluye datos observables en el entorno inmediato?', options: ['a) Sociocultural.', 'b) Lingüístico.', 'c) Situacional.', 'd) Histórico.'] },
+        { num: 130, text: '¿Qué función del lenguaje enfatiza la relación entre interlocutores?', options: ['a) Conativa.', 'b) Fática.', 'c) Emotiva.', 'd) Referencial.'] },
+        { num: 131, text: '¿Qué elemento del acto comunicativo puede incluir gestos y señales gráficas?', options: ['a) Contexto.', 'b) Mensaje.', 'c) Código.', 'd) Canal.'] },
+        { num: 132, text: '¿Qué tipo de código combina reglas establecidas para crear mensajes complejos?', options: ['a) Simple.', 'b) Complejo.', 'c) Situacional.', 'd) Referencial.'] },
+        { num: 133, text: '¿Qué función del lenguaje describe la intención del emisor de persuadir al receptor?', options: ['a) Emotiva.', 'b) Conativa.', 'c) Referencial.', 'd) Poética.'] },
+        { num: 134, text: '¿Qué variedad lingüística está influenciada por el nivel socioeconómico?', options: ['a) Diafásica.', 'b) Diastrática.', 'c) Diatópica.', 'd) Diacrónica.'] },
+        { num: 135, text: '¿Qué función del lenguaje se orienta hacia el código compartido?', options: ['a) Poética.', 'b) Metalingüística.', 'c) Emotiva.', 'd) Conativa.'] }
+    ];
+
+    let currentFilter = 'all';
+
+    // Función de utilidad para mezclar arrays (Fisher-Yates)
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    // --- 2. Funciones de Renderizado y Lógica del Filtro ---
+
+    function getQuestionStatus(qName, savedAnswers) {
+        const savedValue = savedAnswers[qName];
+        if (!savedValue) {
+            return 'pending';
+        }
+        if (savedValue === correctAnswers[qName]) {
+            return 'correct';
+        }
+        return 'incorrect';
+    }
+
+    // Función principal para renderizar el test con el filtro y el orden
+    function renderQuiz() {
+        const container = document.getElementById('quiz-container');
+        container.innerHTML = ''; 
+        const savedAnswers = JSON.parse(localStorage.getItem('quizAnswers')) || {};
+        const savedOrder = JSON.parse(localStorage.getItem('quizOrder'));
+        
+        let questionsToRender = [...allQuestions];
+        
+        // 1. Aplicar el orden (si existe)
+        if (savedOrder) {
+            questionsToRender = savedOrder.map(num => allQuestions.find(q => q.num === num));
+        }
+
+        // 2. Aplicar el filtro
+        questionsToRender = questionsToRender.filter(qData => {
+            const status = getQuestionStatus('q' + qData.num, savedAnswers);
+            if (currentFilter === 'all') return true;
+            return status === currentFilter;
+        });
+
+        // 3. Renderizar preguntas
+        questionsToRender.forEach(qData => {
+            const qName = 'q' + qData.num;
+            const savedValue = savedAnswers[qName];
+            const status = getQuestionStatus(qName, savedAnswers);
+            
+            const isCorrect = status === 'correct';
+            const feedbackClass = status !== 'pending' ? (isCorrect ? 'correct' : 'incorrect') : '';
+            
+            const explanationHtml = status !== 'pending' 
+                ? `<div class="explanation">**Explicación:** ${explanations[qName]}</div>`
+                : '';
+                
+            const correctOptionText = getCorrectOptionText(qData.num, correctAnswers[qName], qData.options);
+
+            const feedbackText = status !== 'pending'
+                ? (isCorrect ? `¡Correcto! ✅ ${explanationHtml}` : `Incorrecto. ❌ La respuesta correcta era: ${correctOptionText}. ${explanationHtml}`) 
+                : '';
+
+            let optionsHtml = qData.options.map((opt, index) => {
+                const optionValue = ['a', 'b', 'c', 'd'][index];
+                const checked = savedValue === optionValue ? 'checked' : '';
+                return `<div class="option"><label><input type="radio" name="${qName}" value="${optionValue}" ${checked} onchange="handleAnswerChange(${qData.num}, this)"> ${opt}</label></div>`;
+            }).join('');
+
+            container.innerHTML += `
+                <div class="question-block" id="${qName}-block">
+                    <strong>${qData.num}. ${qData.text}</strong>
+                    ${optionsHtml}
+                    <div class="feedback ${feedbackClass}">${feedbackText}</div>
+                </div>
+            `;
+        });
+        
+        // 4. Actualizar el estado de los botones de filtro
+        document.querySelectorAll('.filter-controls button').forEach(button => {
+            button.classList.remove('active');
+            if (button.id === `filter-${currentFilter}`) {
+                button.classList.add('active');
+            }
+        });
+        
+        // Ocultar resumen si estaba visible
+        document.getElementById('score-summary').style.display = 'none';
+    }
+
+    // Aplica un nuevo filtro y vuelve a renderizar
+    function applyFilter(filter) {
+        currentFilter = filter;
+        renderQuiz();
+    }
+
+    // Obtiene el texto completo de la opción correcta
+    function getCorrectOptionText(num, correctValue, options) {
+        const index = correctValue.charCodeAt(0) - 'a'.charCodeAt(0);
+        return options[index] || 'Opción no encontrada';
+    }
+
+    // --- 3. Gestión de Eventos y Almacenamiento Local (LocalStorage) ---
+
+    // Maneja el cambio de respuesta (Guarda y da feedback)
+    function handleAnswerChange(num, radioElement) {
+        const qName = 'q' + num;
+        const selectedValue = radioElement.value;
+
+        // 1. Guardar en LocalStorage
+        let savedAnswers = JSON.parse(localStorage.getItem('quizAnswers')) || {};
+        savedAnswers[qName] = selectedValue;
+        localStorage.setItem('quizAnswers', JSON.stringify(savedAnswers));
+
+        // 2. Dar feedback instantáneo
+        const isCorrect = selectedValue === correctAnswers[qName];
+        const qBlock = document.getElementById(qName + '-block');
+        const feedbackDiv = qBlock.querySelector('.feedback');
+        
+        feedbackDiv.className = 'feedback'; // Resetear estilos
+
+        const explanationHtml = `<div class="explanation">**Explicación:** ${explanations[qName]}</div>`;
+        const correctOptionText = getCorrectOptionText(num, correctAnswers[qName], allQuestions.find(q => q.num === num).options);
+        
+        if (isCorrect) {
+            feedbackDiv.classList.add('correct');
+            feedbackDiv.innerHTML = `¡Correcto! ✅ ${explanationHtml}`;
+        } else {
+            feedbackDiv.classList.add('incorrect');
+            feedbackDiv.innerHTML = `Incorrecto. ❌ La respuesta correcta era: ${correctOptionText}. ${explanationHtml}`;
+        }
+        
+        // Si el filtro no es 'all', volvemos a renderizar para ocultar/mover la pregunta
+        if (currentFilter !== 'all') {
+            setTimeout(renderQuiz, 300); // Pequeño retraso para ver el feedback antes de que desaparezca
+        } else {
+            document.getElementById('score-summary').style.display = 'none';
+        }
+    }
+
+    // --- 4. Funciones de Botones ---
+
+    // Borra todas las respuestas y reinicia el test
+    function resetAnswers() {
+        if (confirm('¿Estás seguro de que deseas borrar todas tus respuestas y reiniciar el test?')) {
+            localStorage.removeItem('quizAnswers');
+            localStorage.removeItem('quizOrder'); 
+            currentFilter = 'all'; // Vuelve al filtro por defecto
+            renderQuiz();
+            alert('Respuestas reiniciadas con éxito. El test ha vuelto a su estado original.');
+        }
+    }
+
+    // Muestra las preguntas en orden aleatorio y guarda el nuevo orden
+    function shuffleQuestions() {
+        let questionsToShuffle = [...allQuestions];
+        shuffleArray(questionsToShuffle);
+        
+        // Guardar el nuevo orden de números de pregunta
+        const newOrder = questionsToShuffle.map(q => q.num);
+        localStorage.setItem('quizOrder', JSON.stringify(newOrder));
+        
+        renderQuiz();
+        alert('¡El orden de las preguntas ha sido aleatorizado! Tu progreso se mantiene.');
+    }
+
+    // Muestra la puntuación total
+    function showFinalScore() {
+        let score = 0;
+        const savedAnswers = JSON.parse(localStorage.getItem('quizAnswers')) || {};
+        const totalQuestions = Object.keys(correctAnswers).length;
+        let answeredQuestions = 0;
+
+        for (const qName in correctAnswers) {
+            if (savedAnswers[qName] !== undefined) {
+                answeredQuestions++;
+                if (savedAnswers[qName] === correctAnswers[qName]) {
+                    score++;
+                }
+            }
+        }
+        
+        const percentage = totalQuestions > 0 ? ((score / totalQuestions) * 100).toFixed(1) : 0;
+
+        const scoreSummary = document.getElementById('score-summary');
+        scoreSummary.innerHTML = `
+            <h3>Resultados Generales:</h3>
+            <p>Preguntas respondidas: **${answeredQuestions}** de ${totalQuestions}</p>
+            <p>Aciertos: **${score}**</p>
+            <p>Tasa de acierto (sobre el total): **${percentage}%**</p>
+        `;
+        scoreSummary.style.display = 'block';
+    }
+    
+    // Ejecuta la función principal al cargar el contenido HTML (Solución más fiable)
+    document.addEventListener('DOMContentLoaded', renderQuiz);
+</script>
+
+</body>
+</html>
